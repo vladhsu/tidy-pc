@@ -1,0 +1,29 @@
+{
+    "folderPath" : "/path/to/folder",
+
+    "interval" : 60,
+
+    "fileTypes": {
+        "pdf" : "Documents",
+        "txt" : "Documents",
+        "doc" : "Documents",
+        "docx" : "Documents",
+        "exe" : "Executables",
+        "dmg" : "Executables",
+        "deb" : "Executables",
+        "mp4" : "Videos",
+        "avi" : "Videos",
+        "mkv" : "Videos",
+        "mp3" : "Audio",
+        "wav" : "Audio",
+        "flac" : "Audio",
+        "zip" : "Archives",
+        "rar" : "Archives",
+        "7z" : "Archives",
+        "png" : "Images",
+        "jpg" : "Images",
+        "jpeg" : "Images",
+        "gif" : "Images"
+    }
+
+}
