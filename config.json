@@ -1,29 +1,44 @@
 {
     "folderPath" : "/path/to/folder",
-
     "interval" : 60,
-
     "fileTypes": {
         "pdf" : "Documents",
-        "txt" : "Documents",
+        "txt" : "Text Files",
         "doc" : "Documents",
         "docx" : "Documents",
+        "ppt" : "Presentations",
+        "pptx" : "Presentations",
+        "xls" : "Spreadsheets",
+        "xlsx" : "Spreadsheets",
         "exe" : "Executables",
-        "dmg" : "Executables",
-        "deb" : "Executables",
+        "dmg" : "Disk Images",
+        "deb" : "Package Files",
         "mp4" : "Videos",
         "avi" : "Videos",
         "mkv" : "Videos",
+        "mov" : "Videos",
+        "flv" : "Videos",
         "mp3" : "Audio",
         "wav" : "Audio",
         "flac" : "Audio",
+        "aac" : "Audio",
         "zip" : "Archives",
         "rar" : "Archives",
         "7z" : "Archives",
+        "tar" : "Archives",
+        "gz" : "Archives",
         "png" : "Images",
         "jpg" : "Images",
         "jpeg" : "Images",
-        "gif" : "Images"
+        "gif" : "Images",
+        "bmp" : "Images",
+        "tiff" : "Images",
+        "ico" : "Images",
+        "psd" : "Design Files",
+        "svg" : "Vector Images",
+        "py" : "Python Scripts",
+        "js" : "JavaScript Files",
+        "html" : "HTML Files",
+        "css" : "Stylesheets"
     }
-
 }

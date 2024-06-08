@@ -3,120 +3,152 @@ import shutil
 import hashlib
 import logging
 import json
+from PySide6.QtWidgets import QInputDialog, QMessageBox
+from PySide6.QtCore import Qt
+from collections import Counter
 
 logging.basicConfig(level=logging.INFO)
 
+LARGE_FILE_SIZE_THRESHOLD = 100000000
 
-
-# Create load config funcion
 def loadConfiguration(configFile):
     if not os.path.isfile(configFile):
         logging.error(f"Config file {configFile} does not exist.")
         raise ValueError(f"Config file {configFile} does not exist.")
     try:
         with open(configFile) as file:
-        # Load config file from a JSON file
             return json.load(file)
-    except:
-        json.JSONDecodeError(f"Config file {configFile} is not a valid JSON file.")
+    except json.JSONDecodeError:
+        logging.error(f"Config file {configFile} is not a valid JSON file.")
         raise ValueError(f"Config file {configFile} is not a valid JSON file.")
 
+def get_user_action_for_large_file(parent, file_path):
+    file_size = os.path.getsize(file_path)
+    if file_size > LARGE_FILE_SIZE_THRESHOLD:
+        options = ["Organise", "Archive", "Delete", "Skip"]
+        item, ok = QInputDialog.getItem(parent, "Large File Detected",
+                                        f"{os.path.basename(file_path)} is large. What would you like to do with this file?",
+                                        options, 0, False)
+        if ok and item:
+            return item
+    return "Organise"
 
-def organiseFiles(sourceFolder, config):
+def handle_large_file(parent, file_path):
+    action = get_user_action_for_large_file(parent, file_path)
+    if action == "Skip":
+        return False  # Skip this file
+    elif action == "Delete":
+        os.remove(file_path)  # Delete this file
+        return False
+    elif action == "Archive":
+        archives_folder = os.path.join(os.path.dirname(file_path), 'Archives')
+        if not os.path.exists(archives_folder):
+            os.makedirs(archives_folder)
 
+        file_hash = hashFile(file_path)
+        for root, dirs, files in os.walk(archives_folder):
+            for file in files:
+                existing_file_path = os.path.join(root, file)
+                existing_file_hash = hashFile(existing_file_path)
+                if file_hash == existing_file_hash:
+                    return False
+
+        archive_name = os.path.join(archives_folder, os.path.basename(file_path))
+        shutil.make_archive(archive_name, 'zip', os.path.dirname(file_path), os.path.basename(file_path))
+        os.remove(file_path)
+        return False
+    return True
+
+def organiseFiles(parent, sourceFolder, config):
     if not os.path.exists(sourceFolder):
         logging.error(f"Source folder does not exist.")
         raise FileNotFoundError(f"Source folder does not exist.")
     
     fileTypes = config.get("fileTypes", {})
 
-    # Create folders for each file type
-    for folder in fileTypes.values():
-        folderPath = os.path.join(sourceFolder, folder)
-        try:
-            if not os.path.exists(folderPath):
-                os.makedirs(folderPath)
-        except OSError:
-            logging.error(f"Failed to create directory {folderPath}.")
-            raise
-
-    # Create a dictionary to keep track of file hashes
     fileHashes = {}
 
-    # Iterate over the files in the source folder
     for filename in os.listdir(sourceFolder):
         filePath = os.path.join(sourceFolder, filename)
-        if os.path.isfile(filePath):
-            # Calculate the file hash
-            fileHash = hashFile(filePath)
+        if os.path.isdir(filePath):
+            continue
 
-            # Check for duplicates
-            if fileHash in fileHashes.values():
-                duplicateFolder = os.path.join(sourceFolder, "Duplicates")
-                try:
+        if os.path.isfile(filePath) and not handle_large_file(parent, filePath):
+            continue
+
+        fileHash = hashFile(filePath)
+        fileExtension = filename.split(".")[-1]
+        destinationFolder = fileTypes.get(fileExtension, "Others")
+        destinationFolderPath = os.path.join(sourceFolder, destinationFolder)
+
+        is_duplicate = False
+        if os.path.exists(destinationFolderPath):
+            for existingFile in os.listdir(destinationFolderPath):
+                existingFilePath = os.path.join(destinationFolderPath, existingFile)
+                existingFileHash = hashFile(existingFilePath)
+                if fileHash == existingFileHash:
+                    is_duplicate = True
+                    duplicateFolder = os.path.join(sourceFolder, "Duplicates")
                     if not os.path.exists(duplicateFolder):
                         os.makedirs(duplicateFolder)
-                except OSError:
-                    logging.error(f"Failed to create directory {duplicateFolder}.")
-                    raise
-
-                destinationFilePath = os.path.join(duplicateFolder, filename)
-                try:
+                    destinationFilePath = os.path.join(duplicateFolder, filename)
                     shutil.move(filePath, destinationFilePath)
-                except shutil.Error:
-                    logging.error(f"Failed to move file {filePath} to {destinationFilePath}.")
-                    raise
-            else:
-                if filename in fileHashes.keys():
-                    # If a file with the same name but different content exists
-                    base, extension = os.path.splitext(filename)
-                    i = 1
-                    while filename in fileHashes.keys():
-                        filename = f"{base}({i}){extension}"
-                        i += 1
-                fileHashes[filename] = fileHash
+                    logging.info(f"Moved {filePath} to {destinationFilePath} as duplicate.")
+                    break
 
-                # Determine the destination folder based on the file type
-                fileExtension = filename.split(".")[-1]
-                destinationFolder = fileTypes.get(fileExtension, "Others")
-                destinationFolderPath = os.path.join(sourceFolder, destinationFolder)
-                try:    
-                    if not os.path.exists(destinationFolderPath):
-                        os.makedirs(destinationFolderPath)
-                except OSError:
-                    logging.error(f"Failed to create directory {destinationFolderPath}.")
-                    raise
+        if not is_duplicate:
+            base, extension = os.path.splitext(filename)
+            i = 1
+            new_filename = filename
+            while new_filename in fileHashes:
+                new_filename = f"{base}({i}){extension}"
+                i += 1
+            fileHashes[new_filename] = fileHash
 
-                # Move the file to the correct destination
-                destinationFilePath = os.path.join(destinationFolderPath, filename)
-                try:
-                    shutil.move(filePath, destinationFilePath)
-                except shutil.Error:
-                    logging.error(f"Failed to move file {filePath} to {destinationFilePath}.")
-                    raise
+            if not os.path.exists(destinationFolderPath):
+                os.makedirs(destinationFolderPath)
 
+            destinationFilePath = os.path.join(destinationFolderPath, new_filename)
+            shutil.move(filePath, destinationFilePath)
+            logging.info(f"Moved {filePath} to {destinationFilePath}.")
+
+def deleteDuplicatesFolder(sourceFolder):
+    duplicateFolder = os.path.join(sourceFolder, "Duplicates")
+    if os.path.exists(duplicateFolder):
+        try:
+            shutil.rmtree(duplicateFolder)
+            logging.info(f"Deleted the Duplicates folder.")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to delete the Duplicates folder: {str(e)}")
+            return False
 
 def hashFile(filePath, num_bytes=1024):
-
-    #Calculate the hash of the file
     hasher = hashlib.sha256()
-
     try:
         with open(filePath, 'rb') as f:
-            data = f.read(num_bytes)
-            if len(data) < num_bytes:
-                logging.warning(f"File {filePath} is smaller than {num_bytes} bytes")
-            hasher.update(data)
-            f.seek(-num_bytes, 2)
-            data = f.read(num_bytes)
-            if len(data) < num_bytes:
-                logging.warning(f"File {filePath} is smaller than {num_bytes} bytes")
-            hasher.update(data)
+            file_size = os.path.getsize(filePath)
+            if file_size <= num_bytes:
+                data = f.read()
+                hasher.update(data)
+            else:
+                data = f.read(num_bytes)
+                hasher.update(data)
+                f.seek(-num_bytes, 2)
+                data = f.read(num_bytes)
+                hasher.update(data)
     except FileNotFoundError:
         logging.error(f"File {filePath} not found.")
         raise
     except IOError:
         logging.error(f"Error opening file {filePath}.")
         raise
-
     return hasher.hexdigest()
+
+def get_file_type_statistics(dir):
+    file_types = Counter()
+    for dirpath, dirnames, filenames in os.walk(dir):
+        for filename in filenames:
+            file_extension = os.path.splitext(filename)[1]
+            file_types[file_extension] += 1
+    return file_types
