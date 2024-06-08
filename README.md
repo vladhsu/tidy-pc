@@ -2,8 +2,6 @@
 
 Tidy-PC is a user-friendly application designed to streamline and enhance your file organization process. It simplifies the task by automatically creating dedicated folders for each file type and relocating files from the selected directory into their respective folders.
 
-Absolutely, here's an updated user guide with a tutorial on how to install the latest version of Python and PySide6:
-
 ## User Guide
 
 Before you start using Tidy-PC, ensure that you have the latest versions of Python and PySide6 installed on your system. If you do not have them installed, follow the steps bellow:
